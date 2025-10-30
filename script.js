@@ -9,11 +9,12 @@ let erase=document.querySelector("#erase")
 
 let exp=""
 let res=""
+let open = true
 
 //display using keyboard
 display.addEventListener("input", () => {
-    const allowed = "0123456789.".split("")
-    const operator = "+-*/%()".split("")
+    const allowed = "0123456789."
+    const operator = "+-*/%()"
     let val = display.value;
 
     val = [...val].filter(ch => allowed.includes(ch) || operator.includes(ch)).join("")
@@ -26,20 +27,22 @@ display.addEventListener("input", () => {
         const last = val.at(-1)
         const secondLast = val.at(-2)
 
-        if (secondLast === ")" && last === "(") {
-            val = val.slice(0, -1) + "*("
+        if (last === "." && hasDecimalInCurrentNumber(val.slice(0, -1))) {
+            val = val.slice(0, -1)
         }
 
-        if (secondLast === "%" && "0123456789.".includes(last)) {
-            val = val.slice(0, -1);
+        if (secondLast === ")" && "0123456789(.".includes(last)) {
+            val = val.slice(0, -1) + `*${last}`
+        }
+
+        if (secondLast === "%" && "0123456789(".includes(last)) {
+            val = val.slice(0, -1) + `*${last}`
         } 
         else if (operator.includes(last) && operator.includes(secondLast)) {
         const validCombo =
-            (last === "(" && "+-*/(".includes(secondLast)) ||
-            (last === ")" && "0123456789)%".includes(secondLast)) ||   
-            (secondLast === ")" && "+-*/%".includes(last)) ||
-            (last === "-" &&  "(".includes(secondLast)) ||
-            (last === "%" && "0123456789)".includes(secondLast)) ||
+            (last === "(" && "+-*/())".includes(secondLast)) || 
+            (secondLast === ")" && "+-*/%()".includes(last)) ||
+            (last === "-" && secondLast === "(") ||
             (secondLast === "%" && "+-*/)".includes(last))
         
             if (!validCombo )
@@ -56,7 +59,7 @@ display.addEventListener("input", () => {
 function displayInput(a) {
     a.forEach( (i) => {
         i.addEventListener("click", (e)=> {
-            const operator="+-*/".split("")
+            const operator="+-*/"
 
             let val=e.target.innerText
 
@@ -67,13 +70,20 @@ function displayInput(a) {
             if (display.value === "" && "+*/%)".includes(val)) return
 
             const last = display.value.at(-1)
-            const InvalidCombo = 
-                (operator.includes(val) && operator.includes(last)) ||
-                (last === "%" && "123456789.%".includes(val))
-            if (InvalidCombo) return
+            if ((operator.includes(val) && operator.includes(last))) {
+                if (!(val === "-" && last === "(")) return
+            }
 
+            if(last === "%" && "0123456789(".includes(val)) {
+                display.value += "*" 
+            }
+
+            if (val === "." && hasDecimalInCurrentNumber(display.value)) return
+            
             display.value += val 
             exp=display.value
+
+            updateBracketState()
         })
     }) 
 }
@@ -84,16 +94,26 @@ function calc() {
     if (exp.trim() === "") return
 
     try {
+        if (exp.includes("()")) {
+            display.value = "ERROR"
+            exp = ""
+            return
+        }
+
         let finalExp = ""
         let currentNum = "" 
 
         for (let i of exp) {
             if (i === "%") {
-                finalExp += `(${currentNum}/100)`
-                currentNum = "";
+                if (currentNum !== "") {
+                    finalExp += `${currentNum}/100`
+                    currentNum = ""
+                }
+                else 
+                    continue
             } 
             else {
-                if ("0123456789.".includes(i)) 
+                if ("0123456789.()".includes(i)) 
                     currentNum += i
                 else {
                     finalExp += currentNum + i
@@ -104,6 +124,11 @@ function calc() {
         finalExp += currentNum
 
         res = eval(finalExp)
+        if (!isFinite(res)) {
+            display.value = "Cannot divide by 0"
+            exp = ""
+            return
+        }
         display.value = res
         exp = display.value
     } 
@@ -113,19 +138,45 @@ function calc() {
     }
 }
 
+//check decimal
+function hasDecimalInCurrentNumber(str) {
+    let lastNumber = ""
+    for (let i = str.length - 1; i >= 0; i--) {
+        if ("+-*/%()".includes(str[i])) break
+        lastNumber += str[i]
+    }
+    
+    let count = 0
+    for (let c of lastNumber) {
+        if (c === ".") count++
+    }
+    return count > 0
+}
+
+//update bracket
+function updateBracketState() {
+    let openCount = 0, closeCount = 0
+    for (let char of display.value) {
+        if (char === "(") openCount++
+        else if (char === ")") closeCount++
+    }
+    open = (openCount === closeCount)
+}
+
+
 
 //erase
 erase.addEventListener("click", () => {
     display.value = display.value.slice(0, -1)
     exp=display.value
+    updateBracketState()
 })
 
 //add bracket
-let open = true
 bracket.addEventListener("click", () => {
-    const last = display.value.slice(-1)
+    const last = display.value.at(-1)
     if (open) {  
-        if (last === ")") {
+        if (")%0123456789.".includes(last)) {
             display.value += "*("
         }
         else {
@@ -145,6 +196,7 @@ reset.addEventListener("click", ()=> {
     display.value=""
     res=""
     exp=""
+    open=true
 })
 
 //result

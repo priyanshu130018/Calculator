@@ -32,6 +32,7 @@ input {
     text-align: center;
     background-color: white;
     border: 1px solid #000000;
+    box-sizing: border-box;
 }
 
 .sub-main{ 
